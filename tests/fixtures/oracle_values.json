@@ -1,0 +1,54 @@
+{
+  "bs_european": {
+    "canonical": {"S":100,"K":100,"r":0.05,"q":0.0,"sigma":0.20,"T":1.0,"d1":0.35,"d2":0.15,"call":10.4505835722,"put":5.5735260223,"parity_c_minus_p":4.8770575499,"tol":1e-8,
+                  "source":"closed form recomputed (scipy) and QuantLib 1.43 AnalyticEuropeanEngine; not a Hull example"},
+    "hull_example": {"S":42,"K":40,"r":0.10,"q":0.0,"sigma":0.20,"T":0.5,"d1":0.769263,"d2":0.627841,"call":4.7594223929,"put":0.8085993729,"hull_rounded":{"call":4.76,"put":0.81},"tol_vs_hull":0.005,
+                     "source":"Hull OFOD, BSM chapter worked example (Ex. 15.6 in 9th/10th ed; numbering edition-dependent)"},
+    "fang_oosterlee_gbm": {"S":100,"r":0.10,"q":0.0,"sigma":0.25,"T":0.1,"calls":{"80":20.799226309,"100":3.659968453,"120":0.044577814},"tol":1e-8,"source":"Fang & Oosterlee 2008 eq.(51), Table 2"},
+    "fang_oosterlee_cash_or_nothing": {"S":100,"K":120,"r":0.05,"sigma":0.20,"T":0.1,"payoff":"K*1{S_T>K}","value":0.273306496,"tol":1e-8,"source":"Fang & Oosterlee 2008 eq.(52), Table 3 = K*exp(-rT)*N(d2)"}
+  },
+  "american_put_lsm2001_table1": {
+    "K":40,"r":0.06,"q":0.0,
+    "NOTE":"LSM Table 1 'finite difference' column is a BERMUDAN put exercisable 50x/year (implicit FD, 40,000 t-steps/yr, 1,000 S-steps). Continuous-American true values are 0.004-0.009 HIGHER.",
+    "rows":[
+      {"S":36,"sigma":0.2,"T":1,"lsm_fd_bermudan50":4.478,"lsm_sim":4.472,"lsm_se":0.010,"european_bs":3.844,"american_continuous":4.4867},
+      {"S":36,"sigma":0.2,"T":2,"lsm_fd_bermudan50":4.840,"lsm_sim":4.821,"lsm_se":0.012,"european_bs":3.763,"american_continuous":4.8483},
+      {"S":36,"sigma":0.4,"T":1,"lsm_fd_bermudan50":7.101,"lsm_sim":7.091,"lsm_se":0.020,"european_bs":6.711,"american_continuous":7.1090},
+      {"S":36,"sigma":0.4,"T":2,"lsm_fd_bermudan50":8.508,"lsm_sim":8.488,"lsm_se":0.024,"european_bs":7.700,"american_continuous":8.5142},
+      {"S":38,"sigma":0.2,"T":1,"lsm_fd_bermudan50":3.250,"lsm_sim":3.244,"lsm_se":0.009,"european_bs":2.852,"american_continuous":3.2572},
+      {"S":38,"sigma":0.2,"T":2,"lsm_fd_bermudan50":3.745,"lsm_sim":3.735,"lsm_se":0.011,"european_bs":2.991,"american_continuous":3.7514},
+      {"S":38,"sigma":0.4,"T":1,"lsm_fd_bermudan50":6.148,"lsm_sim":6.139,"lsm_se":0.019,"european_bs":5.834,"american_continuous":6.1546},
+      {"S":38,"sigma":0.4,"T":2,"lsm_fd_bermudan50":7.670,"lsm_sim":7.669,"lsm_se":0.022,"european_bs":6.979,"american_continuous":7.6749},
+      {"S":40,"sigma":0.2,"T":1,"lsm_fd_bermudan50":2.314,"lsm_sim":2.313,"lsm_se":0.009,"european_bs":2.066,"american_continuous":2.3196},
+      {"S":40,"sigma":0.2,"T":2,"lsm_fd_bermudan50":2.885,"lsm_sim":2.879,"lsm_se":0.010,"european_bs":2.356,"american_continuous":2.8900},
+      {"S":40,"sigma":0.4,"T":1,"lsm_fd_bermudan50":5.312,"lsm_sim":5.308,"lsm_se":0.018,"european_bs":5.060,"american_continuous":5.3183},
+      {"S":40,"sigma":0.4,"T":2,"lsm_fd_bermudan50":6.920,"lsm_sim":6.921,"lsm_se":0.022,"european_bs":6.326,"american_continuous":6.9235},
+      {"S":42,"sigma":0.2,"T":1,"lsm_fd_bermudan50":1.617,"lsm_sim":1.617,"lsm_se":0.007,"european_bs":1.465,"american_continuous":1.6212},
+      {"S":42,"sigma":0.2,"T":2,"lsm_fd_bermudan50":2.212,"lsm_sim":2.206,"lsm_se":0.010,"european_bs":1.841,"american_continuous":2.2167},
+      {"S":42,"sigma":0.4,"T":1,"lsm_fd_bermudan50":4.582,"lsm_sim":4.588,"lsm_se":0.017,"european_bs":4.379,"american_continuous":4.5882},
+      {"S":42,"sigma":0.4,"T":2,"lsm_fd_bermudan50":6.248,"lsm_sim":6.243,"lsm_se":0.021,"european_bs":5.736,"american_continuous":6.2502},
+      {"S":44,"sigma":0.2,"T":1,"lsm_fd_bermudan50":1.110,"lsm_sim":1.118,"lsm_se":0.007,"european_bs":1.017,"american_continuous":1.1130},
+      {"S":44,"sigma":0.2,"T":2,"lsm_fd_bermudan50":1.690,"lsm_sim":1.675,"lsm_se":0.009,"european_bs":1.429,"american_continuous":1.6933},
+      {"S":44,"sigma":0.4,"T":1,"lsm_fd_bermudan50":3.948,"lsm_sim":3.957,"lsm_se":0.017,"european_bs":3.783,"american_continuous":3.9528},
+      {"S":44,"sigma":0.4,"T":2,"lsm_fd_bermudan50":5.647,"lsm_sim":5.622,"lsm_se":0.021,"european_bs":5.202,"american_continuous":5.6467}
+    ],
+    "tolerances":{"american_continuous_vs_converged_psor":1e-3,"american_continuous_vs_lsm_fd_column":0.012,"lsm_estimate":"within 3*se of american_continuous, and >= european_bs"},
+    "american_continuous_source":"QuantLib 1.43 QdFpAmericanEngine(highPrecision); cross-checked FdBlackScholesVanillaEngine(2000,2000) and CRR N=5000 to <=4e-4"
+  },
+  "hull_american_put_tree": {"S":50,"K":50,"r":0.10,"sigma":0.40,"T":0.4166667,"crr_5_steps":4.4905,"hull_rounded_5_steps":4.49,"crr_30":4.2637,"crr_50":4.2722,"crr_100":4.2781,"crr_500":4.2830,"converged":4.2842,"converged_tol":3e-4,"european_put":4.0760,
+    "source":"Hull OFOD ch. Basic Numerical Procedures (5-step tree = 4.49); converged from QuantLib QdFp 4.28422 / FD 4.28408"},
+  "heston": {
+    "fang_oosterlee_2008":{"S":100,"K":100,"r":0.0,"q":0.0,"v0":0.0175,"kappa":1.5768,"theta":0.0398,"sigma_v":0.5751,"rho":-0.5711,"feller_violated":true,
+      "call_T1":{"published":5.785155450,"quantlib_5_engines":5.785155434,"tol":1e-6},
+      "call_T10":{"published":22.318945791,"quantlib_5_engines":22.318945791,"tol":1e-6},
+      "source":"Fang & Oosterlee, SIAM J. Sci. Comput. 31(2) 2008, eq.(53), Tables 4-5; params from Albrecher et al. 2007 'Little Heston Trap' calibration"},
+    "andersen_2008_case1":{"S":100,"K":100,"r":0.0,"q":0.0,"v0":0.04,"kappa":0.5,"theta":0.04,"sigma_v":1.0,"rho":-0.9,"T":10,"call":13.08467014,"tol":1e-6,
+      "source":"Andersen 2008 J.Comp.Finance QE-scheme paper Case I (attribution from memory: likely); value verified QuantLib AnalyticHestonEngine (Gatheral & AndersenPiterbarg) 13.08467014"}
+  },
+  "convergence_constants_S100_K100_r5_sig20_T1_call": {
+    "crr_N_times_error":{"even_N":-2.062,"odd_N":1.690,"bound":"|err| <= 2.2/N for N>=10; sign alternates with parity; err(2N)/err(N) -> 0.5 same parity"},
+    "leisen_reimer_N2_times_error":-0.354,
+    "crank_nicolson_quantlib_strike_on_node":{"err_at_n":"~0.0636*(100/n)^2 for tGrid=xGrid=n","ratio_on_doubling":"4.18,4.09,4.04,4.02,4.01"},
+    "mc_exact_sd_discounted_payoff":{"call":14.719404,"put":8.657580,"antithetic_equiv_per_draw_sd_call":10.40,"control_variate_S_T":{"corr":0.924504,"variance_factor":0.145292,"sd_call":5.6106}}
+  }
+}

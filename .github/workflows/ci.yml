@@ -1,0 +1,25 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install -e ".[dev,oracle]"
+      - run: ruff check src tests
+      - run: pytest -q
+      # the committed README tables must regenerate: validation / convergence tables byte-identically,
+      # the bench table on its deterministic |error| columns (times and QuantLib columns vary by machine)
+      - run: |
+          pricers report
+          git diff --exit-code -- README.md
+          pricers bench --check

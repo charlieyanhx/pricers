@@ -1,0 +1,37 @@
+[project]
+name = "pricers"
+version = "0.1.0"
+description = "Independent option-pricing implementations (Black-Scholes, binomial/trinomial trees, finite differences, Monte Carlo, Heston COS) with a verification harness: closed-form and QuantLib oracles, convergence-rate tests, regenerable accuracy-vs-speed table."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Hanxiong (Charlie) Yan" }]
+dependencies = ["numpy>=1.26", "scipy>=1.11"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff"]
+oracle = ["QuantLib>=1.43"]
+
+[project.urls]
+Homepage = "https://github.com/charlieyanhx/pricers"
+
+[project.scripts]
+pricers = "pricers.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pricers"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "B"]
+ignore = ["E501"]
