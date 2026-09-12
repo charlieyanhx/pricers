@@ -42,6 +42,8 @@ def test_hull_five_step_american_put_is_4_49(oracle):
 
 
 def test_hull_american_put_converges_to_4_2842_at_large_n(oracle):
+    """Hull's put (S=K=50, r=10%, sigma=40%, T=5/12): CRR and JR at N=5000, KR trinomial at N=2000, within
+    1e-3 of the converged 4.2842 (QuantLib QdFpAmericanEngine)."""
     o = oracle["hull_american_put_tree"]
     for method in ("crr", "jr"):
         p = trees.binomial(o["S"], o["K"], o["T"], o["sigma"], "P", 5000, o["r"], exercise="american", method=method).price
@@ -50,7 +52,9 @@ def test_hull_american_put_converges_to_4_2842_at_large_n(oracle):
     assert t == pytest.approx(o["converged"], abs=1e-3)
 
 
-def test_bbsr_beats_plain_crr_by_two_orders_on_the_hull_put(oracle):
+def test_bbsr_beats_plain_crr_by_an_order_of_magnitude_on_the_hull_put(oracle):
+    """Hull's put vs the converged 4.2842: plain CRR at N=100 is 6.1e-3 off, BBSR (N=100/200) 3.2e-4, a 19x
+    gain; asserted as BBSR < 5e-4 and at least 10x better than plain CRR."""
     o = oracle["hull_american_put_tree"]
     plain = trees.binomial(o["S"], o["K"], o["T"], o["sigma"], "P", 100, o["r"], exercise="american").price
     bbsr = trees.richardson(

@@ -75,12 +75,17 @@ def binomial(S: float, K: float, T: float, sigma: float, right: str, n: int = 50
         raise ValueError(f"risk-neutral probability {p:.4f} outside (0,1): increase n")
     disc = np.exp(-r * dt)
     j = np.arange(n + 1)
-    # spot at level k, node j (j up-moves): S u^j d^(k-j); level-k nodes are the first k+1 entries
-    S_last = S * u**j * d ** (n - j)
-    V = _payoff(S_last, K, right)
+    # spot at level k, node j (j up-moves): S u^j d^(k-j) = S d^k (u/d)^j; (u/d)^j is computed once and
+    # sliced per level, so the American projection costs one scalar power per level, not a fresh grid
+    ratio_pow = (u / d) ** j
+
+    def spots(k: int) -> np.ndarray:
+        return S * d**k * ratio_pow[: k + 1]
+
+    V = _payoff(spots(n), K, right)
     start = n - 1
     if bbs:  # Broadie-Detemple: last-step continuation = Black-Scholes over dt, then max with intrinsic
-        S_pen = S * u ** j[: n] * d ** (n - 1 - j[: n])
+        S_pen = spots(n - 1)
         V = np.asarray(bs.price(S_pen, K, dt, sigma, right, r, q), dtype=float)
         if exercise == "american":
             V = np.maximum(V, _payoff(S_pen, K, right))
@@ -88,7 +93,7 @@ def binomial(S: float, K: float, T: float, sigma: float, right: str, n: int = 50
     for k in range(start, -1, -1):
         V = disc * (p * V[1 : k + 2] + (1.0 - p) * V[: k + 1])
         if exercise == "american":
-            V = np.maximum(V, _payoff(S * u ** j[: k + 1] * d ** (k - j[: k + 1]), K, right))
+            V = np.maximum(V, _payoff(spots(k), K, right))
     return TreeResult(float(V[0]), n, method, exercise)
 
 

@@ -13,12 +13,15 @@ def _eu(right="C", **kw):
 
 
 def test_closed_form_payoff_sd_matches_oracle_to_1e6(oracle):
+    """Exact sd of the discounted payoff on the canonical case (fixture: 14.719404 call, 8.65758 put; lognormal
+    partial moments recomputed at value-collection time)."""
     o = oracle["convergence_constants_S100_K100_r5_sig20_T1_call"]["mc_exact_sd_discounted_payoff"]
     assert mc.payoff_sd_exact(100.0, 100.0, 1.0, 0.2, "C", 0.05) == pytest.approx(o["call"], abs=1e-6)
     assert mc.payoff_sd_exact(100.0, 100.0, 1.0, 0.2, "P", 0.05) == pytest.approx(o["put"], abs=1e-6)
 
 
 def test_plain_se_times_sqrt_n_is_within_10pct_of_14_7194_at_n_200k(oracle):
+    """Plain MC s.e. x sqrt(n) vs the exact sd of the discounted payoff (fixture), call and put, seed 7."""
     o = oracle["convergence_constants_S100_K100_r5_sig20_T1_call"]["mc_exact_sd_discounted_payoff"]
     for right, sd in (("C", o["call"]), ("P", o["put"])):
         res = _eu(right, n=200_000, seed=7)
@@ -27,6 +30,8 @@ def test_plain_se_times_sqrt_n_is_within_10pct_of_14_7194_at_n_200k(oracle):
 
 
 def test_control_variate_variance_factor_is_within_0_12_to_0_18(oracle):
+    """S_T control variate on the canonical call: residual variance ratio vs the fixture's 1 - corr^2 = 0.1453
+    (corr 0.9245) and its s.e. x sqrt(n) vs the fixture's 5.6106."""
     o = oracle["convergence_constants_S100_K100_r5_sig20_T1_call"]["mc_exact_sd_discounted_payoff"]["control_variate_S_T"]
     res = _eu(n=200_000, seed=7, control_variate=True)
     assert 0.12 <= res.variance_factor <= 0.18
@@ -35,6 +40,7 @@ def test_control_variate_variance_factor_is_within_0_12_to_0_18(oracle):
 
 
 def test_antithetic_equivalent_per_draw_sd_matches_oracle_within_10pct(oracle):
+    """Antithetic s.e. x sqrt(n) on the canonical call vs the fixture's 10.4 (measured at value-collection time)."""
     o = oracle["convergence_constants_S100_K100_r5_sig20_T1_call"]["mc_exact_sd_discounted_payoff"]
     res = _eu(n=200_000, seed=7, antithetic=True)
     assert res.se * np.sqrt(res.n) == pytest.approx(o["antithetic_equiv_per_draw_sd_call"], rel=0.10)

@@ -9,6 +9,8 @@ CANON = dict(S=100.0, K=100.0, T=1.0, sigma=0.2, r=0.05)
 
 
 def test_canonical_call_and_put_match_oracle_to_1e8(oracle):
+    """S=K=100, r=5%, sigma=20%, T=1: 10.4505835722 / 5.5735260223, recomputed with scipy and QuantLib 1.43
+    AnalyticEuropeanEngine (fixture); not a textbook example."""
     o = oracle["bs_european"]["canonical"]
     c = bs.price(o["S"], o["K"], o["T"], o["sigma"], "C", o["r"], o["q"])
     p = bs.price(o["S"], o["K"], o["T"], o["sigma"], "P", o["r"], o["q"])

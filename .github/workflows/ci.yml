@@ -14,7 +14,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: python -m pip install -e ".[dev,oracle]"
+      - run: python -m pip install -e ".[dev]"
+      # [oracle] = QuantLib, the optional cross-check dependency: 4 tests and the bench's QuantLib columns use it
+      - run: python -m pip install -e ".[oracle]"
       - run: ruff check src tests
       - run: pytest -q
       # the committed README tables must regenerate: validation / convergence tables byte-identically,

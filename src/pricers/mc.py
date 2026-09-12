@@ -17,7 +17,12 @@ Variance reduction:
 LSMC (`american_put_lsm`): 50 exercise dates per year, antithetic paths, regression of the
 discounted continuation value on a constant and the first three weighted Laguerre
 polynomials of S/K, in-the-money paths only, as in Longstaff & Schwartz (2001); the price is
-the mean of the resulting exercise cash flows, so it carries a small low bias.
+the mean of the resulting exercise cash flows, so it carries a small low bias. Its `se` is the
+paper's convention: the s.e. of that mean *conditional on the exercise rule fitted on the same
+paths*, which leaves out the regression's own sampling variance. Measured over 150 seeds at
+n = 20,000: on the Table 1 case S = 36 the empirical sd of the estimate is 0.95x the reported
+se (95% CI covers the reference 92% of the time); with a large exercise region (S = K = 100,
+sigma = 30%, r = 5%, q = 8%) it is 1.16x and the CI covers 86%. Read the LSM se as a floor.
 
 Invariants kept and tested: the sd of the discounted payoff matches its closed form (14.7194
 for the reference call, 8.6576 for the put); |estimate - Black-Scholes| < 3 se at fixed seeds;
@@ -149,7 +154,8 @@ def _laguerre_basis(x: np.ndarray) -> np.ndarray:
 def american_put_lsm(S: float, K: float, T: float, sigma: float, r: float = 0.0, q: float = 0.0,
                      n: int = 100_000, steps_per_year: int = 50, seed=0, antithetic: bool = True) -> MCResult:
     """Longstaff-Schwartz American put; the reported se is that of the mean exercise cash flow
-    over paths (pair means when antithetic), the paper's convention."""
+    over paths (pair means when antithetic), conditional on the fitted exercise rule: the paper's
+    convention, and an understatement of up to ~16% when the exercise region is large (module docstring)."""
     n_steps = int(round(steps_per_year * T))
     if n_steps < 1 or n < 100 or (antithetic and n % 2):
         raise ValueError("need steps_per_year * T >= 1, n >= 100 (even when antithetic)")

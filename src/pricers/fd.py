@@ -6,11 +6,15 @@ central differences in x, theta-scheme in tau (theta = 0 explicit, 1/2 CN, 1 imp
 Dirichlet boundaries: the European asymptotic values (max'ed with intrinsic for American).
 
 Grid (`Grid`): n_x intervals (n_x rounded up to even), the strike on the centre node, half-width
-`width` sigma sqrt(T) plus |ln(S/K)|; the step h is nudged so that S also lands on a node when
-|ln(S/K)| >= h/2; the price is read by a cubic spline (exact at nodes). The strike-on-node
-placement is what makes CN converge at second order after Rannacher start-up (two implicit
-half-steps replace the first CN step). `Grid.n_t` defaults to n_x, except explicit, which
-takes the smallest stable count when n_t is not given (dt <= h^2 / sigma^2).
+`width` sigma sqrt(T) plus |ln(S/K)|, step h = half-width / (n_x / 2) exactly; the price is read
+off a cubic spline through the final layer (exact at nodes, O(h^4) between them, so S need not be
+a node: an earlier version nudged h to put S on a node, which pinned h to |ln(S/K)| near the
+money and stalled refinement there). The strike-on-node placement is what makes CN converge at
+second order after Rannacher start-up (two implicit half-steps replace the first CN step).
+`Grid.n_t` defaults to n_x, except explicit, which takes the smallest stable count plus one when
+n_t is not given (dt <= h^2 / sigma^2; the +1 because exactly at the limit the highest grid mode
+has amplification -1 and is never damped: at n_x = 200 the error is 1.1e-3 at the limit and 8e-4
+one step inside it).
 
 American: `american="psor"` is textbook projected SOR, lexicographic, pure Python (slow: the
 reference); `american="bs"` is the Brennan-Schwartz projected-Thomas sweep (elimination from the
@@ -66,12 +70,9 @@ def make_grid(S: float, K: float, T: float, sigma: float, n_x: int = 200, n_t: i
     half = width * sigma * np.sqrt(T) + abs(np.log(S / K))
     m = n_x // 2
     h = half / m
-    k = np.log(S / K) / h
-    if abs(k) >= 0.5:                              # nudge h so S sits on a node too
-        h = np.log(S / K) / round(k)
     x = np.log(K) + (np.arange(n_x + 1) - m) * h
     if n_t is None:
-        n_t = n_x if scheme != "explicit" else int(np.ceil(T * sigma**2 / h**2)) + 1
+        n_t = n_x if scheme != "explicit" else int(np.ceil(T * sigma**2 / h**2)) + 1   # limit + 1, see docstring
     return Grid(x, float(h), int(n_t), m)
 
 

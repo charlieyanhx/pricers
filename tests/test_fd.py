@@ -18,13 +18,29 @@ def test_crank_nicolson_error_ratio_on_grid_doubling_is_second_order():
     assert errs[-1] < 2e-4
 
 
+def test_crank_nicolson_stays_second_order_with_spot_between_nodes():
+    """S = 100.37319 (ln(S/K) = 0.37% of a step at n_x = 200): the spot is read off the spline, h = half / m
+    exactly, and err(n)/err(2n) is 4.00 / 4.00 / 4.00 for n = 200..1600 (measured); an h nudged to put S
+    on a node stalled at ratio 1.00 between n = 400 and 800 here."""
+    S = 100.37319
+    ref = bs.price(S, 100.0, 1.0, 0.2, "C", 0.05, 0.01)
+    errs = [abs(fd.price(S, 100.0, 1.0, 0.2, "C", 0.05, 0.01, n_x=n).price - ref) for n in (200, 400, 800, 1600)]
+    for e1, e2 in zip(errs[:-1], errs[1:], strict=True):
+        assert 3.3 <= e1 / e2 <= 4.7, errs
+    assert errs[2] < 2e-4
+    assert fd.make_grid(S, 100.0, 1.0, 0.2, 800).h == pytest.approx((1.0 + abs(np.log(S / 100.0))) / 400, rel=1e-12)
+
+
 def test_implicit_scheme_is_first_order_and_explicit_is_stable_at_its_own_dt():
     e_impl = [abs(fd.price(100.0, 100.0, 1.0, 0.2, "C", 0.05, n_x=n, scheme="implicit").price - REF_CALL)
               for n in (100, 200, 400)]
     assert 1.7 <= e_impl[0] / e_impl[1] <= 2.9 and 1.7 <= e_impl[1] / e_impl[2] <= 2.9
     res = fd.price(100.0, 100.0, 1.0, 0.2, "C", 0.05, n_x=200, scheme="explicit")
-    assert res.n_t >= 1.0 * 0.2**2 / fd.make_grid(100.0, 100.0, 1.0, 0.2, 200).h**2
+    lam_min = 1.0 * 0.2**2 / fd.make_grid(100.0, 100.0, 1.0, 0.2, 200).h**2
+    assert res.n_t == int(np.ceil(lam_min)) + 1                 # the smallest stable count plus one
     assert abs(res.price - REF_CALL) < 1e-3
+    at_limit = fd.price(100.0, 100.0, 1.0, 0.2, "C", 0.05, n_x=200, n_t=int(np.ceil(lam_min)), scheme="explicit").price
+    assert 1e-3 < abs(at_limit - REF_CALL) < 2e-3              # exactly at the limit the top mode is undamped
     with pytest.raises(ValueError):
         fd.price(100.0, 100.0, 1.0, 0.2, "C", 0.05, n_x=200, n_t=20, scheme="explicit")
 
@@ -42,6 +58,7 @@ def test_put_call_parity_of_fd_prices_to_1e4():
 
 
 def test_brennan_schwartz_equals_psor_on_the_same_grid_to_1e6(oracle):
+    """Hull's put (S=K=50, r=10%, sigma=40%, T=5/12) on one 150 x 150 grid: the two LCP solvers agree to 1e-6."""
     o = oracle["hull_american_put_tree"]
     kw = dict(n_x=150, exercise="american")
     a = fd.price(o["S"], o["K"], o["T"], o["sigma"], "P", o["r"], american="bs", **kw)
@@ -51,6 +68,7 @@ def test_brennan_schwartz_equals_psor_on_the_same_grid_to_1e6(oracle):
 
 
 def test_hull_american_put_converges_to_4_2842_with_brennan_schwartz(oracle):
+    """Hull's put on an 800 x 800 grid vs the converged 4.2842 (QuantLib QdFpAmericanEngine), 1e-3."""
     o = oracle["hull_american_put_tree"]
     res = fd.price(o["S"], o["K"], o["T"], o["sigma"], "P", o["r"], n_x=800, exercise="american", american="bs")
     assert res.price == pytest.approx(o["converged"], abs=1e-3)
@@ -94,11 +112,12 @@ def test_bumped_greeks_match_black_scholes_for_the_european_case():
     assert g.theta == pytest.approx(ref.theta, rel=3e-2)
 
 
-def test_grid_puts_strike_and_spot_on_nodes():
+def test_grid_puts_strike_on_the_centre_node_with_the_exact_step():
     g = fd.make_grid(90.0, 100.0, 1.0, 0.2, n_x=200)
-    assert np.isclose(np.exp(g.x[g.i_strike]), 100.0)
-    assert np.min(np.abs(np.exp(g.x) - 90.0)) < 1e-9
+    assert np.isclose(np.exp(g.x[g.i_strike]), 100.0) and g.i_strike == 100
+    assert g.h == pytest.approx((5.0 * 0.2 + abs(np.log(0.9))) / 100, rel=1e-12)
     assert len(g.x) == 201 and g.n_t == 200
+    assert g.x[0] <= np.log(90.0) - 5.0 * 0.2 + 1e-12 and g.x[-1] >= np.log(90.0) + 5.0 * 0.2 - 1e-12
 
 
 def test_cn_matches_quantlib_fd_engine_within_their_combined_error(ql, ql_bs_process, ql_option):

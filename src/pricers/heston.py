@@ -7,17 +7,28 @@ Conventions: per-share prices, continuous r and q, T in years, `right` "C"/"P". 
 priced as put + S e^{-qT} - K e^{-rT} (parity), because the put's COS coefficients are bounded
 on the truncation range while the call's grow with e^b, as the paper recommends.
 
-Truncation range [a, b] = c1 -+ L sqrt(c2 + sqrt(c4)) from the cumulants of ln(S_T/S_0): c1 and c2
-in closed form, c4 by a five-point stencil on log phi at u = 0 (`c4="numeric"`, the default; `c4=0`
-reproduces the plain c1 -+ L sqrt(c2) range). Defaults N = 256, L = 12. Measured on the paper's
-T = 1 case: with c4 = 0 the error saturates at -3.9e-5 for any N (QuantLib's COSHestonEngine at
-L = 12, N = 256 gives the same -3.9e-5), with the c4 term it is 4.5e-8. Very heavy tails (the
-Andersen 2008 case, sigma_v = 1, T = 10) make the numerical c4 unusable and need c4=0 with
-L ~ 30 and N ~ 2048 instead; see the tests.
+Truncation range in y = ln(S_T/K): [a, b] = x + c1 -+ L sqrt(c2 + sqrt(c4)) with x = ln(S/K) and
+c1, c2, c4 the cumulants of ln(S_T/S_0) (the paper's eq. (49): the cumulants of ln(S_T/K) are those
+of ln(S_T/S_0) shifted by x). c1 and c2 are in closed form, c4 by a five-point stencil on log phi at
+u = 0 (`c4="numeric"`, the default; `c4=0` reproduces the plain c1 -+ L sqrt(c2) range). The put's
+payoff support is [a, min(b, 0)] and the put is 0 when a >= 0, so the range holds for any
+moneyness (a range placed on c1 alone, without x, leaks the density off [a, b] once |x| exceeds
+about 4.5 sigma sqrt(T) and returns negative calls; a test at 6-10 standard deviations keeps this).
 
-Invariants kept and tested: COS under GBM matches Black-Scholes to 1e-8; Heston call prices
-match the paper's eq. (53) values (T = 1: 5.785155450, T = 10: 22.318945791) to 1e-6 and
-QuantLib's COSHestonEngine when installed; put-call parity holds by construction.
+Defaults N = 1024, L = 12 (the GBM check `price_gbm` keeps N = 256, L = 10, the paper's GBM
+setting). Measured on the paper's T = 1 case: with c4 = 0 the error saturates at -3.9e-5 for any N
+(QuantLib's COSHestonEngine at L = 12, N = 256 gives the same -3.9e-5), with the c4 term it is
+4.5e-8 already at N = 256. N = 256 is not enough in general: for Feller-violated, high vol-of-vol
+parameters (sigma_v ~ 0.9, kappa < 1, T ~ 1-2 y) the c4 term widens the range about 2.5x and
+256 terms leave errors of 1e-3 near the money, which N = 1024 brings below 1e-7 (test:
+`test_feller_violated_high_vol_of_vol_needs_1024_terms`). Very heavy tails (the Andersen 2008
+case, sigma_v = 1, T = 10) make the numerical c4 unusable and need c4=0 with L ~ 30 and N ~ 2048
+instead; see the tests.
+
+Invariants kept and tested: COS under GBM matches Black-Scholes to 1e-8 at the money and to
+1e-10 at 6-10 standard deviations from it; Heston call prices match the paper's eq. (53) values
+(T = 1: 5.785155450, T = 10: 22.318945791) to 1e-6 and QuantLib's COSHestonEngine when
+installed; put-call parity holds by construction.
 """
 
 from __future__ import annotations
@@ -106,26 +117,29 @@ def _chi_psi(k: np.ndarray, a: float, b: float, c: float, d: float) -> tuple[np.
 
 
 def cos_price(cf: Callable[[np.ndarray], np.ndarray], S: float, K: float, T: float, right: str, r: float, q: float,
-              cumulants: tuple[float, float, float], N: int = 256, L: float = 12.0) -> float:
+              cumulants: tuple[float, float, float], N: int = 1024, L: float = 12.0) -> float:
     """Generic COS price for a vanilla; `cf(u)` is the characteristic function of ln(S_T/S_0)."""
     c1, c2, c4 = cumulants
-    a = c1 - L * np.sqrt(c2 + np.sqrt(max(c4, 0.0)))
-    b = c1 + L * np.sqrt(c2 + np.sqrt(max(c4, 0.0)))
-    k = np.arange(N)
-    chi, psi = _chi_psi(k, a, b, a, 0.0)          # put: payoff support [a, 0] in y = ln(S_T/K)
-    U = 2.0 / (b - a) * (-chi + psi)              # V_k / K for the put
     x = np.log(S / K)
-    u = k * np.pi / (b - a)
-    terms = np.real(cf(u) * np.exp(1j * u * (x - a))) * U
-    terms[0] *= 0.5
-    put = K * np.exp(-r * T) * np.sum(terms)
+    w = L * np.sqrt(c2 + np.sqrt(max(c4, 0.0)))
+    a, b = x + c1 - w, x + c1 + w                 # range in y = ln(S_T/K): cumulants of ln(S_T/S_0) shifted by x
+    if a >= 0.0:                                  # the whole density sits above the strike: the put is worthless
+        put = 0.0
+    else:
+        k = np.arange(N)
+        chi, psi = _chi_psi(k, a, b, a, min(b, 0.0))  # put: payoff support [a, min(b, 0)] in y
+        U = 2.0 / (b - a) * (-chi + psi)          # V_k / K for the put
+        u = k * np.pi / (b - a)
+        terms = np.real(cf(u) * np.exp(1j * u * (x - a))) * U
+        terms[0] *= 0.5
+        put = K * np.exp(-r * T) * np.sum(terms)
     if right == "P":
         return float(put)
     return float(put + S * np.exp(-q * T) - K * np.exp(-r * T))
 
 
 def price(S: float, K: float, T: float, right: str, params: HestonParams, r: float = 0.0, q: float = 0.0,
-          N: int = 256, L: float = 12.0, c4="numeric") -> float:
+          N: int = 1024, L: float = 12.0, c4="numeric") -> float:
     """European Heston price by COS with N terms and range parameter L (see module docstring)."""
     if T <= 0 or S <= 0 or K <= 0 or right not in ("C", "P"):
         raise ValueError("need T > 0, S > 0, K > 0, right in {'C','P'}")

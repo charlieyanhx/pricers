@@ -61,9 +61,11 @@ def validation(o: dict) -> list[Check]:
                      [abs(heston.price_gbm(g["S"], float(k), g["T"], g["sigma"], "C", g["r"]) - v) for k, v in g["calls"].items()]
                      + [abs(heston.price_gbm(x, K, T, s, rt, r, 0.01) - bs.price(x, K, T, s, rt, r, 0.01))
                         for rt in "CP" for x in (80.0, 100.0, 125.0)]))
-    out.append(Check("CRR, Jarrow-Rudd, Kamrad-Ritchken trees, European, N=2000", "Black-Scholes; bound 2.2/N", 2.2 / 2000 * 2, [
-        abs(trees.binomial(S, K, T, s, rt, 2000, r, method=m).price - _ref_call_put(rt)) for rt in "CP" for m in ("crr", "jr")]
+    out.append(Check("CRR and Kamrad-Ritchken trinomial trees, European, N=2000", "Black-Scholes; bound 2.2/N", 2.2 / 2000, [
+        abs(trees.binomial(S, K, T, s, rt, 2000, r).price - _ref_call_put(rt)) for rt in "CP"]
         + [abs(trees.trinomial(S, K, T, s, rt, 2000, r).price - _ref_call_put(rt)) for rt in "CP"]))
+    out.append(Check("Jarrow-Rudd tree, European, N=2000", "Black-Scholes (no pre-registered bound; test bar 2e-3)", 2e-3, [
+        abs(trees.binomial(S, K, T, s, rt, 2000, r, method="jr").price - _ref_call_put(rt)) for rt in "CP"]))
     hp = o["hull_american_put_tree"]
     out.append(Check("CRR American put, 5 steps", "Hull 5-step tree 4.49", 5e-3, [
         abs(trees.binomial(hp["S"], hp["K"], hp["T"], hp["sigma"], "P", 5, hp["r"], exercise="american").price
@@ -109,7 +111,7 @@ def validation(o: dict) -> list[Check]:
     out.append(Check("LSMC American put (same run)", "continuous-American column", 0.03, lsm_d))
     fo = o["heston"]["fang_oosterlee_2008"]
     hpar = heston.HestonParams(fo["v0"], fo["kappa"], fo["theta"], fo["sigma_v"], fo["rho"])
-    out.append(Check("Heston COS, N=256, L=12, numeric c4", "Fang & Oosterlee 2008 eq. (53), T=1 and T=10 (Feller violated)", 1e-6, [
+    out.append(Check("Heston COS, N=1024, L=12, numeric c4", "Fang & Oosterlee 2008 eq. (53), T=1 and T=10 (Feller violated)", 1e-6, [
         abs(heston.price(fo["S"], fo["K"], 1.0, "C", hpar) - fo["call_T1"]["published"]),
         abs(heston.price(fo["S"], fo["K"], 10.0, "C", hpar) - fo["call_T10"]["published"])]))
     an = o["heston"]["andersen_2008_case1"]
@@ -149,7 +151,8 @@ def convergence(o: dict) -> list[tuple[str, str, str]]:
         ("MC antithetic: s.e. x sqrt(n), call", f"{av.se * np.sqrt(av.n):.2f}", f"{sd['antithetic_equiv_per_draw_sd_call']:.2f} (fixture)"),
         ("MC S_T control variate: variance factor, beta", f"{cv.variance_factor:.4f}, {cv.beta:.3f}",
          f"{sd['control_variate_S_T']['variance_factor']:.4f} = 1 - corr^2, corr {sd['control_variate_S_T']['corr']:.4f}"),
-        ("Heston COS abs(error) at N = 32 / 64 / 128 / 256, T=1", " / ".join(f"{e:.1e}" for e in cos), "exponential in N"),
+        ("Heston COS abs(error) at N = 32 / 64 / 128 / 256, T=1", " / ".join(f"{e:.1e}" for e in cos),
+         "exponential in N: each doubling > 10x (tested)"),
     ]
     return rows
 

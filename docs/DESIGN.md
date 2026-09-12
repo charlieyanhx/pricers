@@ -31,19 +31,28 @@ implemented (`method="crr"` and `"crr-ql"`), and the `crr-ql` variant matches
 p = ½; the trinomial is Kamrad-Ritchken with λ = √3 (p_mid = 2/3).
 
 Backward induction is one numpy expression per level (slices of the level array), with the
-American projection as a `np.maximum` against the level's intrinsic values; N = 5,000 runs
-in about 30 ms. `bbs=True` replaces the continuation value at the penultimate level by the
-Black-Scholes value over the last dt (Broadie-Detemple), which removes the sawtooth, and
-`richardson(fn, n)` = 2 fn(2n) − fn(n) completes BBSR: on Hull's put it reaches 3e-4 at
-N = 100/200 where plain CRR at N = 100 is 2e-2 off.
+American projection as a `np.maximum` against the level's intrinsic values, which come from
+(u/d)^j computed once and sliced per level (S d^k (u/d)^j), so the projection costs one
+scalar power per level. European N = 5,000 runs in about 18 ms (bench table); the American
+put takes about 3x that (the intrinsic projection: 55 ms of CPU time in a run where the
+European took 19 ms; before the precomputation it recomputed S u^j d^(k−j) at every level
+and took 0.37 s, 20x). `bbs=True` replaces the continuation value at the penultimate level
+by the Black-Scholes value over the last dt (Broadie-Detemple), which removes the sawtooth,
+and `richardson(fn, n)` = 2 fn(2n) − fn(n) completes BBSR: on Hull's put it reaches 3.2e-4
+at N = 100/200 where plain CRR at N = 100 is 6.1e-3 off (19x; the test asserts 10x).
 
 ### Finite differences (`fd.py`)
 
 Log-spot grid, uniform in x = ln S. The strike sits on the centre node (n_x is rounded up
-to even) and the step is nudged so that S also lands on a node whenever |ln(S/K)| ≥ h/2;
-the price is read from a cubic spline through the final layer, which is exact at nodes. The
-half-width is `width`·σ√T + |ln(S/K)| with width = 5, and the boundaries are the European
-asymptotic values (max'ed with intrinsic for American).
+to even), the step is exactly half-width / (n_x / 2), and the price is read from a cubic
+spline through the final layer, which is exact at nodes and O(h⁴) between them, so S need
+not be a node. (v0.1 nudged h to put S on a node too; for |ln(S/K)| between h/2 and 3h/2 —
+about ±0.4% of spot at n_x = 800 — that pinned h to |ln(S/K)| whatever n_x was, so at
+S = 100.373 the error did not move between n_x = 400 and 800 and 6 of 564 strikes in a fine
+sweep exceeded the 2e-4 bar. Without the nudge the ratio is 4.00 / 4.00 / 4.00 there and the
+sweep's worst is 1.5e-4; a test keeps the off-node ratio.) The half-width is `width`·σ√T +
+|ln(S/K)| with width = 5, and the boundaries are the European asymptotic values (max'ed with
+intrinsic for American).
 
 Theta-scheme in τ = T − t with central differences: θ = 0 explicit, ½ Crank-Nicolson,
 1 implicit; implicit steps solve the tridiagonal system with `scipy.linalg.solve_banded`.
@@ -51,7 +60,9 @@ Rannacher start-up replaces the first CN step by two implicit half-steps, which 
 oscillation the payoff kink otherwise feeds into CN. With the strike on a node the measured
 CN error ratio on grid doubling is 4.02, 4.01, 4.00, 4.00 for n = 50…800 (QuantLib's
 engine on its own mesher: 4.18, 4.09, 4.04, 4.02). Explicit picks the smallest stable
-n_t (dt ≤ h²/σ²) when none is given and raises when an unstable one is.
+n_t (dt ≤ h²/σ²) plus one when none is given — exactly at the limit the highest grid mode
+has amplification −1 and is never damped, and the n_x = 200 error is 1.1e-3 there against
+8e-4 one step inside — and raises when an unstable one is.
 
 American exercise, two solvers:
 
@@ -64,8 +75,9 @@ American exercise, two solvers:
   system for the transformed right-hand side is solved in C (`solve_banded`) and only the
   projected back-substitution from the bottom is a Python loop. It is exact when the exercise
   region is one interval [0, S*], which holds for the put. All 20 Longstaff-Schwartz cases
-  on an 800 × 800 grid take 2.2 s in total and land within 2.7e-4 of the continuous-American
-  reference (bar: 1e-3). Calls with q > 0 have the region at the top and must use PSOR;
+  on an 800 × 800 grid take about 3 s in total on the bench machine (2.6 s wall unloaded, 3.6 s
+of CPU time under heavy load) and land
+  within 2.7e-4 of the continuous-American reference (bar: 1e-3). Calls with q > 0 have the region at the top and must use PSOR;
   a mirrored sweep for calls is v0.2.
 
 Greeks are by bump-and-reprice on one fixed grid (S ± 1% read off the spline, σ ± 1e-3,
@@ -98,6 +110,15 @@ cases. The bar is therefore 0.03 per case plus a mean-deviation check in (−0.0
 and the literal 0.02 bar is asserted on the first Table 1 case. The README table reports
 the measured worst cases.
 
+The LSM `se` is the paper's: the standard error of the mean exercise cash flow conditional on
+the exercise rule fitted on the same paths, so it leaves out the regression's own sampling
+variance. Measured over 150 seeds at n = 20,000: on the Table 1 case S = 36 the empirical sd
+of the estimate is 0.95x the reported se and the 95% CI covers the reference 92% of the time;
+with a large exercise region (S = K = 100, σ = 30%, r = 5%, q = 8%, QdFp reference 12.6475)
+it is 1.16x and coverage is 86%, bias −0.02. The European estimators are nominal. The LSM se
+is therefore a floor, and the docstring says so; a batch-means or fit/price split estimator
+is v0.2.
+
 ### Heston COS (`heston.py`)
 
 The characteristic function is the Albrecher et al. (2007) / Gatheral form
@@ -107,14 +128,24 @@ long maturities; the Fang-Oosterlee test parameters violate the Feller condition
 priced as put + parity, because the put's cosine coefficients are bounded on the truncation
 range while the call's grow with e^b.
 
-Truncation range [c1 − L√(c2 + √c4), c1 + L√(c2 + √c4)] with c1, c2 in closed form and c4
-from a five-point stencil on log φ at u = 0. Two measurements shaped this:
+Truncation range in y = ln(S_T/K): [x + c1 − L√(c2 + √c4), x + c1 + L√(c2 + √c4)] with
+x = ln(S/K) and c1, c2, c4 the cumulants of ln(S_T/S_0) (the paper's eq. (49): the cumulants
+of ln(S_T/K) are those of ln(S_T/S_0) shifted by x). c1, c2 are in closed form and c4 comes
+from a five-point stencil on log φ at u = 0; the put's payoff support is [a, min(b, 0)] and
+the put is 0 when a ≥ 0. v0.1 placed the range at c1 without the x shift and used [a, 0] for
+the support: exact at S = K, which is every fixture case, and silently wrong once |x| passed
+about 4.5 σ√T (the K = 200, T = 0.02 GBM call came back as −99.8, deep-ITM puts as 0). The
+test now covers 6–10 sd under GBM against Black-Scholes (1e-13) and 6–38 sd under Heston
+against QuantLib's analytic engine (1e-8). Three measurements shaped the rest:
 
 - The variance formula printed in Fang & Oosterlee's Table 11, as transcribed here, is
   smaller than the true Var(ln S_T/S_0) by η²θ(1 − e^{−κT})/(4κ³) (about 2% for the test
   parameters). c2 was re-derived symbolically from E[I] + Var(I)/4 − (ρ/η)(Cov(I, v_T) +
   κ Var(I)) with I = ∫v dt and the CIR covariance e^{−κ(t−s)} Var(v_s), and it agrees with
-  the numerical second derivative of log φ to 1e-9; the test keeps that check.
+  the numerical second derivative of log φ (Richardson-extrapolated central differences,
+  h = 5e-3 and h/2) to 1e-9 at T = 1 and T = 10; the test keeps that check, and a second test
+  carries the printed Table 11 formula and asserts the gap is exactly that term (6.660e-4 at
+  T = 1, 8.394e-4 at T = 10).
 - With c4 = 0 the T = 1 error saturates at −3.9e-5 for any N (QuantLib's `COSHestonEngine`
   at L = 12, N = 256 gives the same −3.9e-5); with the c4 term the range widens enough that
   N = 256, L = 12 reaches 4.5e-8 at T = 1 and 1.5e-10 at T = 10. The paper's stated
@@ -122,6 +153,16 @@ from a five-point stencil on log φ at u = 0. Two measurements shaped this:
   Extremely heavy tails (Andersen 2008 Case I, σ_v = 1, κ = 0.5, T = 10) make the numerical
   c4 unusable (it is h-dependent and of order 100); that case is validated with c4 = 0,
   L = 30, N = 2048 (7e-7) and documented as such.
+- N = 256 is enough for the two fixture cases and not in general. For Feller-violated,
+  high vol-of-vol parameters (v0 = 0.089, κ = 0.57, θ = 0.065, σ_v = 0.93, ρ = −0.78,
+  T = 1.67) the c4 term widens the half-width from 5.5 to 13.5 and 256 terms leave a 2.2e-3
+  error on a near-the-money put (QuantLib analytic reference); N = 512 gives 8.5e-5, 1024
+  3e-8, 2048 3e-12. On a 400-case random sweep (v0, θ ∈ [0.01, 0.16], κ ∈ [0.3, 4],
+  σ_v ∈ [0.1, 1], ρ ∈ [−0.9, 0.3], 5–730 days, |ln S/K| ≤ 0.7) N = 256 exceeded 1e-6 in 30
+  cases (worst 8.6e-4), N = 1024 in none (worst 3e-9). The default is therefore N = 1024;
+  the whole COS call is still well under a millisecond. The 1e-6 claim in the README table is
+  for the two fixture cases; the sweep numbers are in the docstring of the test that keeps
+  the near-the-money case.
 
 The COS machinery is generic in the characteristic function; `price_gbm` runs it with the
 GBM characteristic function and reproduces Black-Scholes and the paper's Table 2 to 1e-8,
@@ -129,12 +170,15 @@ which separates errors in the Heston characteristic function from errors in the 
 
 ## Oracle provenance
 
-`tests/fixtures/oracle_values.json` is verbatim from the value-collection step; the sources
-are listed in `tests/fixtures/README.md`. In short: the canonical Black-Scholes values are
+`tests/fixtures/oracle_values.json` is the value-collection file as recorded, with no keys
+added or pruned since (it still carries an unused `leisen_reimer_N2_times_error`); the
+sources are listed in `tests/fixtures/README.md`. In short: the canonical Black-Scholes values are
 recomputed (scipy, QuantLib 1.43 `AnalyticEuropeanEngine`) and are not a textbook example;
 Hull's worked example and 5-step tree are from *Options, Futures, and Other Derivatives*;
 the GBM, cash-or-nothing and Heston values are from Fang & Oosterlee (2008), Tables 2–5,
-with the Heston parameters from Albrecher et al. (2007); the American put grid is
+with the Heston parameters from Albrecher et al. (2007) and a QuantLib cross-check recorded
+under `quantlib_5_engines` (the file does not name the engines; the test here re-checks
+against `COSHestonEngine` and `AnalyticHestonEngine`); the American put grid is
 Longstaff & Schwartz (2001) Table 1 with a continuous-American column added from QuantLib's
 `QdFpAmericanEngine` (high precision) and cross-checked against `FdBlackScholesVanillaEngine`
 and a 5,000-step CRR; the Andersen (2008) attribution is marked "from memory: likely" in the
@@ -149,10 +193,10 @@ paths are sequential scalar loops that numpy cannot express — the projected ba
 in Brennan-Schwartz, the PSOR sweep, and per-node American projection inside a fused tree
 induction — and that a Rust extension ships as a wheel with no runtime dependency and no JIT
 warm-up, which matters for a library that deskboard will import at start-up. The Python
-implementations stay as the reference and the tests compare the two to 1e-12. Nothing is
-started: no Rust toolchain was present on the build machine (no `cargo`/`rustc`), so the
-v0.1 release is pure numpy/scipy, and the bench table shows where the time goes (on the
-build machine the trees are 4–8x behind QuantLib's C++, Crank-Nicolson 1.2–5x, and the
+implementations will stay as the reference and the tests will compare the two to 1e-12.
+Nothing is started: no Rust toolchain was present on the build machine (no `cargo`/`rustc`),
+so the v0.1 release is pure numpy/scipy, and the bench table shows where the time goes (on
+the build machine the trees are 4–8.5x behind QuantLib's C++, Crank-Nicolson 1.2–5.2x, and the
 vectorised MC ahead; the American solvers, which are the Python-loop paths, are not in the
 bench because QuantLib has no matching engine at the same resolution).
 
@@ -161,6 +205,8 @@ bench because QuantLib has no matching engine at the same resolution).
 Heston calibration; Brennan-Schwartz for calls (mirrored sweep); LSMC beyond the put and
 beyond 50 fixed dates a year; Leisen-Reimer and Tian trees; non-uniform (strike-concentrated)
 FD meshes; a Greeks-from-the-grid path (delta/gamma from neighbouring nodes, cheaper than
-bumping); the Rust hot paths above. QuantLib cross-checks exist for the binomial, FD,
-American and Heston engines but not for MC (its RNG differs, so only the closed form is a
-fair oracle there).
+bumping); an LSM standard error that includes the regression's sampling variance (batch
+means, or fit on one path set and price on another); the Rust hot paths above. QuantLib
+cross-check *tests* exist for the binomial, FD, American and Heston engines but not for MC
+(its RNG differs, so only the closed form is a fair oracle there); the bench table shows
+QuantLib's `MCEuropeanEngine` beside ours for timing only.

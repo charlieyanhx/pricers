@@ -24,7 +24,9 @@ they appear:
   `QdFpAmericanEngine` 4.28422 and FD 4.28408.
 - `heston.fang_oosterlee_2008` — Fang & Oosterlee (2008) eq. (53), Tables 4-5, parameters from
   Albrecher, Mayer, Schoutens & Tistaert (2007), *The little Heston trap* (Feller condition
-  violated); cross-checked against five QuantLib engines.
+  violated); the `quantlib_5_engines` key is a QuantLib cross-check recorded at value-collection
+  time (the engines are not named in the file; the test here re-checks against `COSHestonEngine`
+  and `AnalyticHestonEngine`).
 - `heston.andersen_2008_case1` — Andersen (2008), *Simple and efficient simulation of the Heston
   stochastic volatility model*, J. Comp. Finance, Case I (attribution noted in the file as from
   memory); value verified with QuantLib `AnalyticHestonEngine`.
