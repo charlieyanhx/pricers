@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.1 — 2026-09-12
+- `bs.implied_vol_vec`: a point whose price already matched to 1e-15 could be overwritten by the bracket midpoint on the same iteration when the Newton step underflowed (50 of 20,000 rounded-price puts wrong by up to 0.43 vol, found by the volsurf review). Converged points are now kept; regression test on 20,000 rounded prices against Brent.
+
 ## 0.2.0 — 2026-09-12
 - `calibrate`: Heston calibration by least squares in implied-vol space with bounds and multi-start; `CalibrationResult` carries RMSE, max residual, Feller flag and every start's outcome. Recovers generating parameters from three starts; fits 20 bp noise to the noise level.
 - `heston.price_strikes`: one characteristic-function evaluation per maturity for all strikes (equal to `price` to 1e-12).

@@ -22,7 +22,7 @@ machine.
 
 ```bash
 pip install -e ".[dev,oracle]"   # [oracle] = QuantLib 1.43, optional; its tests skip when absent
-pytest -q                        # 75 tests: identities to 1e-10, oracles at stated tolerances,
+pytest -q                        # 76 tests: identities to 1e-10, oracles at stated tolerances,
                                  #   convergence rates, QuantLib cross-checks (4, skipped without
                                  #   QuantLib), bench/CLI; about 20 s on an M1 laptop
 pricers report                   # regenerate the validation and convergence tables in this README

@@ -103,3 +103,25 @@ def test_array_inputs_broadcast_and_equal_the_scalar_path():
 def test_array_greeks_reject_expired_entries():
     with pytest.raises(ValueError):
         bs.greeks(np.array([100.0, 100.0]), 100.0, np.array([1.0, 0.0]), 0.2, "C")
+
+
+def test_implied_vol_vec_equals_brent_on_rounded_prices_including_the_at_root_bracket_case():
+    """20,000 puts with 4-dp prices: the vectorised inverter must agree with Brent wherever both are finite.
+    Before 0.2.1 a point whose price already matched to 1e-15 could be replaced by the bracket midpoint
+    on the same iteration (50 of 20,000 wrong by up to 0.43 vol; K=62.9605, T=0.16758, put 1.9344 ->
+    0.5507 instead of 0.9827). NaN only where the price sits within 1e-10·S of intrinsic, never a number."""
+    rng = np.random.default_rng(0)
+    n = 20_000
+    S, r, q = 100.0, 0.02, 0.01
+    K = S * np.exp(rng.uniform(-0.6, 0.4, n))
+    T = rng.uniform(0.02, 2.0, n)
+    sig = rng.uniform(0.05, 1.0, n)
+    px = np.round(bs.price(S, K, T, sig, "P", r, q), 4)
+    v = bs.implied_vol_vec(px, S, K, T, "P", r, q)
+    b = np.array([bs.implied_vol(float(p), S, float(k), float(t), "P", r, q) for p, k, t in zip(px, K, T, strict=True)])
+    both = np.isfinite(v) & np.isfinite(b)
+    assert both.sum() > 19_000 and not np.any(np.isfinite(v) & ~np.isfinite(b))
+    assert np.max(np.abs(v[both] - b[both])) < 1e-9
+    assert np.max(np.abs(bs.price(S, K[both], T[both], v[both], "P", r, q) - px[both])) < 1e-8
+    single = bs.implied_vol_vec(1.9344, S, 62.96047355984453, 0.16758227853157368, "P", r, q)
+    assert single == pytest.approx(0.9827096153667981, abs=1e-9)

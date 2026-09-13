@@ -1,6 +1,6 @@
 [project]
 name = "pricers"
-version = "0.2.0"
+version = "0.2.1"
 description = "Independent option-pricing implementations (Black-Scholes, binomial/trinomial trees, finite differences, Monte Carlo, Heston COS) with a verification harness: closed-form and QuantLib oracles, convergence-rate tests, regenerable accuracy-vs-speed table."
 readme = "README.md"
 requires-python = ">=3.11"

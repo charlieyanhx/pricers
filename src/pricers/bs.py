@@ -174,7 +174,11 @@ def implied_vol_vec(target, S, K, T, right: str, r: float = 0.0, q: float = 0.0,
         new = sig[active] - step
         bad = (new <= lo_a) | (new >= hi_a) | ~np.isfinite(new)
         new = np.where(bad, 0.5 * (lo_a + hi_a), new)
-        done = (np.abs(new - sig[active]) < tol) | (np.abs(diff) < 1e-15)   # converge in SIGMA, not price
+        # a point whose price already matches to 1e-15 is converged: keep it, or the bracket test above
+        # (new == hi after an underflowed step) would replace the root by the bracket midpoint
+        at_root = np.abs(diff) < 1e-15
+        new = np.where(at_root, sig[active], new)
+        done = at_root | (np.abs(new - sig[active]) < tol)   # converge in SIGMA, not price
         sig[active] = new
         lo[active], hi[active] = lo_a, hi_a
         idx = np.flatnonzero(active)
