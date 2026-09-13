@@ -147,6 +147,37 @@ def price(S: float, K: float, T: float, right: str, params: HestonParams, r: flo
                      cumulants_heston(T, params, r, q, c4), N, L)
 
 
+def price_strikes(S: float, strikes: np.ndarray, T: float, right: str, params: HestonParams, r: float = 0.0,
+                  q: float = 0.0, N: int = 1024, L: float = 12.0, c4="numeric") -> np.ndarray:
+    """COS prices for many strikes at one maturity with ONE characteristic-function evaluation.
+
+    In y = ln(S_T/K) the range is [x + c1 − w, x + c1 + w] with x = ln(S/K): its width 2w and the
+    phase x − a = w − c1 are strike-independent, so cf(u)·e^{iu(x−a)} is shared and only the payoff
+    coefficients (chi, psi over [a, min(b, 0)]) change per strike. Identical to `price` to machine
+    precision (tested); ~len(strikes)× faster for a surface."""
+    if T <= 0 or S <= 0 or right not in ("C", "P"):
+        raise ValueError("need T > 0, S > 0, right in {'C','P'}")
+    Ks = np.asarray(strikes, dtype=float)
+    c1, c2, c4v = cumulants_heston(T, params, r, q, c4)
+    w = L * np.sqrt(c2 + np.sqrt(max(c4v, 0.0)))
+    width = 2.0 * w
+    k = np.arange(N)
+    u = k * np.pi / width
+    shared = np.real(cf_heston(u, T, params, r, q) * np.exp(1j * u * (w - c1)))
+    shared[0] *= 0.5
+    out = np.empty(len(Ks))
+    for i, K in enumerate(Ks):
+        x = np.log(S / K)
+        a, b = x + c1 - w, x + c1 + w
+        if a >= 0.0:
+            put = 0.0
+        else:
+            chi, psi = _chi_psi(k, a, b, a, min(b, 0.0))
+            put = K * np.exp(-r * T) * np.sum(shared * (2.0 / width) * (-chi + psi))
+        out[i] = put if right == "P" else put + S * np.exp(-q * T) - K * np.exp(-r * T)
+    return out
+
+
 def price_gbm(S: float, K: float, T: float, sigma: float, right: str, r: float = 0.0, q: float = 0.0,
               N: int = 256, L: float = 10.0) -> float:
     """Black-Scholes price by COS (the machinery check; L = 10 as in the paper's GBM tests)."""

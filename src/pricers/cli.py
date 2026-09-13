@@ -20,6 +20,9 @@ def main(argv: list[str] | None = None) -> None:
     rp = sub.add_parser("report", help="validation and convergence-rate tables; rewrites README.md by default")
     rp.add_argument("--readme", default=str(README))
     rp.add_argument("--no-write", action="store_true", help="print the tables only")
+    cal = sub.add_parser("calibrate", help="Heston calibration demo: recover known parameters from a synthetic surface")
+    cal.add_argument("--noise", type=float, default=0.0, help="Gaussian noise added to the surface, in vol (0.002 = 20 bp)")
+    cal.add_argument("--seed", type=int, default=0)
     p = sub.add_parser("price", help="price one option by one method")
     p.add_argument("--method", choices=METHODS, default="bs")
     p.add_argument("--S", type=float, required=True)
@@ -54,6 +57,27 @@ def main(argv: list[str] | None = None) -> None:
         if not a.no_write:
             report.write_readme(Path(a.readme), text)
             print(f"wrote the tables to {a.readme}")
+    elif a.cmd == "calibrate":
+        import time
+
+        import numpy as np
+
+        from .calibrate import Surface, calibrate
+        from .heston import HestonParams
+
+        true = HestonParams(v0=0.04, kappa=1.5, theta=0.05, sigma_v=0.6, rho=-0.7)
+        surf = Surface.from_params(100.0, 0.02, 0.01, [70, 80, 90, 95, 100, 105, 110, 120, 130], [0.1, 0.25, 0.5, 1.0, 2.0], true)
+        if a.noise:
+            surf = Surface(surf.S, surf.r, surf.q, surf.K, surf.T, surf.iv + np.random.default_rng(a.seed).normal(0, a.noise, len(surf.iv)))
+        t0 = time.time()
+        res = calibrate(surf)
+        print(f"true      v0={true.v0:.4f} kappa={true.kappa:.3f} theta={true.theta:.4f} sigma_v={true.sigma_v:.3f} rho={true.rho:.3f}")
+        print(f"fitted    {res.summary()}")
+        print(f"{res.n_points} points, {len(res.starts)} starts, {time.time() - t0:.1f} s")
+        for t in res.starts:
+            s0 = t["start"]
+            print(f"  from v0={s0.v0:.2f} kappa={s0.kappa:.1f} theta={s0.theta:.2f} sigma_v={s0.sigma_v:.1f} rho={s0.rho:.1f}: "
+                  f"RMSE {t['rmse_vol'] * 100:.4f} vol pts, kappa {t['params'].kappa:.3f}")
     elif a.cmd == "price":
         print(_price(a))
 
