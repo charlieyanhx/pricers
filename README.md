@@ -229,6 +229,10 @@ review agent and the evals that measure it ·
 [deskboard](https://github.com/charlieyanhx/deskboard) — options risk / P&L dashboard with
 deterministic replay (its pricer has this `bs` API, so this module is a drop-in) ·
 [riskkit](https://github.com/charlieyanhx/riskkit) — VaR / ES, backtests, stress and the
-edge-case contracts for a futures-and-options book.
+edge-case contracts for a futures-and-options book ·
+[tickq](https://github.com/charlieyanhx/tickq) — DuckDB market-data SQL: partitioned Parquet lake, ASOF
+joins with the tie rule stated, quality checks with recall and precision ·
+[lobcore](https://github.com/charlieyanhx/lobcore) — bounded-array limit order book in Rust with a
+reference-book differential test, ITCH 5.0 replay and PyO3 bindings.
 
 MIT © Hanxiong (Charlie) Yan
